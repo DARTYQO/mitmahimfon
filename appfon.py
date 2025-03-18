@@ -525,6 +525,178 @@ class RecentPostsAPI:
         except Exception as e:
             print(f"שגיאה בקבלת פוסטים אחרונים: {str(e)}")
             return None
+
+
+class CategoryTopicsAPI:
+    def __init__(self):
+        self.base_url = "https://mitmachim.top"
+        self.session = requests.Session()
+        self.session.verify = False
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/json'
+        }
+
+    def get_category_topics(self, category_id, limit=10):
+        """
+        מושך את הנושאים האחרונים מקטגוריה ספציפית
+        :param category_id: מזהה הקטגוריה
+        :param limit: כמות הנושאים לשליפה
+        :return: רשימה של נושאים אחרונים
+        """
+        try:
+            print(f"מושך {limit} נושאים אחרונים מקטגוריה {category_id}...")
+            
+            response = self.session.get(
+                f"{self.base_url}/api/category/{category_id}",
+                params={
+                    'topicCount': limit,
+                    'sort': 'newest'  # מיון לפי החדשים ביותר
+                },
+                headers=self.headers
+            )
+            
+            if not response.ok:
+                print(f"שגיאה בקבלת נושאים: {response.status_code}")
+                return None
+
+            topics_data = response.json()
+            return topics_data.get('topics', [])
+
+        except Exception as e:
+            print(f"שגיאה בקבלת נושאים: {str(e)}")
+            return None
+
+    def get_topic_posts(self, topic_id):
+        """
+        מושך את כל הפוסטים של נושא ספציפי
+        :param topic_id: מזהה הנושא
+        :return: רשימה של פוסטים מסודרת לפי תאריך
+        """
+        try:
+            print(f"מושך פוסטים מנושא {topic_id}...")
+            
+            response = self.session.get(
+                f"{self.base_url}/api/topic/{topic_id}",
+                headers=self.headers
+            )
+            
+            if not response.ok:
+                print(f"שגיאה בקבלת פוסטים: {response.status_code}")
+                return None
+
+            topic_data = response.json()
+            posts = topic_data.get('posts', [])
+            
+            # מיון הפוסטים לפי תאריך
+            posts.sort(key=lambda x: x.get('timestamp', 0))
+            
+            return posts
+
+        except Exception as e:
+            print(f"שגיאה בקבלת פוסטים: {str(e)}")
+            return None
+
+    def prepare_topic_tts(self, topic, posts, topic_index):
+        """
+        מכין את תוכן ה-TTS עבור נושא ופוסטים
+        :param topic: מידע על הנושא
+        :param posts: רשימת הפוסטים
+        :param topic_index: אינדקס הנושא (1-10)
+        :return: רשימה של קבצי TTS לנושא
+        """
+        tts_files = []
+        
+        # הכנת הקדמה לנושא
+        topic_intro = f"{topic.get('title', '')}. "
+        topic_intro += f"נפתח על ידי {topic.get('user', {}).get('username', 'משתמש לא ידוע')}. "
+        topic_intro += f"מספר תגובות: {len(posts)}."
+        
+        # כל נושא מקבל את המספר שלו כתת-שלוחה
+        extension_number = topic_index  # שלוחה 1 לנושא 1, שלוחה 2 לנושא 2 וכו'
+        
+        tts_files.append({
+            'text': clean_text_for_tts(topic_intro),
+            'filename': f"4/{extension_number}/000.tts"  # הקדמה לנושא
+        })
+        
+        # הכנת כל הפוסטים
+        for post_index, post in enumerate(posts, 1):
+            username = post.get('user', {}).get('username', 'משתמש לא ידוע')
+            content = post.get('content', '')
+            
+            # ניקוי התוכן
+            soup = BeautifulSoup(content, 'html.parser')
+            clean_content = soup.get_text(strip=True)
+            
+            post_text = f"תגובה מספר {post_index} מאת {username}. {clean_content}"
+            
+            tts_files.append({
+                'text': clean_text_for_tts(post_text),
+                'filename': f"4/{extension_number}/{post_index:03d}.tts"
+            })
+        
+        return tts_files
+
+    def upload_to_yemot(self, yemot_api, category_id=66, topic_limit=10):
+        """
+        מעלה את כל הנושאים והפוסטים לימות
+        :param yemot_api: מופע של YemotAPI
+        :param category_id: מזהה הקטגוריה
+        :param topic_limit: מספר הנושאים לשליפה
+        """
+        if not yemot_api.token:
+            print("נדרשת התחברות לימות תחילה")
+            return False
+
+        # שליפת הנושאים האחרונים
+        topics = self.get_category_topics(category_id, topic_limit)
+        if not topics:
+            print("לא נמצאו נושאים")
+            return False
+
+        print(f"\nנמצאו {len(topics)} נושאים, מתחיל בהעלאה...")
+
+        # עיבוד והעלאת כל נושא
+        success_count = 0
+        total_files = 0
+        
+        for topic_index, topic in enumerate(topics, 1):
+            posts = self.get_topic_posts(topic.get('tid'))
+            if posts:
+                # הכנת קבצי ה-TTS לנושא הנוכחי
+                topic_files = self.prepare_topic_tts(topic, posts, topic_index)
+                total_files += len(topic_files)
+                
+                # העלאת כל הקבצים של הנושא הנוכחי
+                for file_info in topic_files:
+                    try:
+                        data = {
+                            "token": yemot_api.token,
+                            "what": f"ivr2:/{file_info['filename']}",
+                            "contents": file_info['text']
+                        }
+                        
+                        print(f"\nמעלה קובץ: {file_info['filename']}")
+                        print(f"תוכן: {file_info['text'][:100]}...")
+                        
+                        response = requests.post(f"{yemot_api.base_url}UploadTextFile", data=data)
+                        
+                        if response.status_code == 200 and response.json().get('responseStatus') == 'OK':
+                            print("הקובץ הועלה בהצלחה")
+                            success_count += 1
+                        else:
+                            print(f"שגיאה בהעלאת הקובץ")
+                        
+                        time.sleep(2)  # המתנה בין העלאות
+                        
+                    except Exception as e:
+                        print(f"שגיאה בהעלאת קובץ: {str(e)}")
+            
+            time.sleep(1)  # המתנה בין נושאים
+
+        print(f"\nהועלו {success_count} קבצים מתוך {total_files}")
+        return success_count > 0
         
 
 def get_nodebb_content(url, username, password):
@@ -650,6 +822,14 @@ def main():
             print("\nסיום העלאת כל הפוסטים האחרונים לשלוחה 2")
         else:
             print("לא התקבלו פוסטים אחרונים")
+
+        if api.login():
+            print("התחברות לימות הצליחה!")
+            
+            # === שלוחה 4 - נושאים מקטגוריית "כללי - עזרה הדדית" ===
+            print("\nמתחיל בטיפול בנושאי הפורום לשלוחה 4...")
+            forum_api = CategoryTopicsAPI()
+            forum_api.upload_to_yemot(api, category_id=66, topic_limit=10)        
     else:
         print("ההתחברות לימות נכשלה")
     
