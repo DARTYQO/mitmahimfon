@@ -2,7 +2,7 @@ name: Run Code Every Minute
 
 on:
   schedule:
-    - cron: "*/1 * * * *"
+    - cron: "*/5 * * * *"
 
 jobs:
   run_code:
