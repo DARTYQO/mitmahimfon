@@ -125,12 +125,13 @@ class YemotAPI:
             print(f"שגיאה בהעלאת התראה {index + 1}: {str(e)}")
             return False
     
-def clean_text_for_tts(text, notification_number):
+def clean_text_for_tts(text, notification_number=None):
     """
     מנקה ומעבד טקסט להקראה עם שיפורים
     """
-    # הוספת פתיח להודעה
-    intro = f"התראה מספר {notification_number}. "
+    # רק אם יש מספר התראה, נוסיף את הפתיח
+    if notification_number is not None:
+        text = f"התראה מספר {notification_number}. {text}"
     
     # ניקוי קישורים והחלפתם במילה [קישור]
     text = re.sub(r'https?://\S+', '[קישור]', text)
@@ -154,10 +155,7 @@ def clean_text_for_tts(text, notification_number):
     if not text.endswith(('.', '!', '?')):
         text += '.'
     
-    # חיבור הפתיח עם התוכן
-    final_text = intro + text
-    
-    return final_text
+    return text
 
 def get_nodebb_post_content(url):
     """
@@ -466,6 +464,69 @@ class NodeBBAPI:
             print(f"שגיאה בקבלת פוסטים: {str(e)}")
             return None
 
+class RecentPostsAPI:
+    def __init__(self):
+        self.base_url = "https://mitmachim.top"
+        self.session = requests.Session()
+        self.session.verify = False
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/json'
+        }
+
+    def get_recent_posts(self, limit=10):
+        """
+        מושך את הפוסטים האחרונים מהפורום
+        :param limit: מספר הפוסטים לשליפה
+        :return: רשימה של פוסטים מעובדים
+        """
+        try:
+            print(f"מושך {limit} פוסטים אחרונים...")
+            
+            # שליפת הפוסטים האחרונים מ-API של NodeBB
+            response = self.session.get(
+                f"{self.base_url}/api/recent/posts",
+                params={'count': limit},
+                headers=self.headers
+            )
+            
+            if not response.ok:
+                print(f"שגיאה בקבלת פוסטים אחרונים: {response.status_code}")
+                return None
+
+            posts_data = response.json()
+            if not isinstance(posts_data, list):
+                print("תגובת השרת לא בפורמט הצפוי")
+                return None
+
+            processed_posts = []
+            for i, post in enumerate(posts_data):
+                username = post.get('user', {}).get('username', 'משתמש לא ידוע')
+                content = post.get('content', '')
+                topic_title = post.get('topic', {}).get('title', 'נושא לא ידוע')
+                
+                soup = BeautifulSoup(content, 'html.parser')
+                clean_content = soup.get_text(strip=True)
+                
+                # יצירת הטקסט עם הפתיח הרצוי
+                post_text = f"פוסט מספר {i + 1}. פוסט מאת {username} בנושא {topic_title}. {clean_content}"
+                
+                # קריאה לפונקציית הניקוי בלי מספר התראה
+                clean_text = clean_text_for_tts(post_text)
+                
+                if clean_text:
+                    processed_posts.append({
+                        'text': clean_text,
+                        'index': i
+                    })
+
+            return processed_posts
+
+        except Exception as e:
+            print(f"שגיאה בקבלת פוסטים אחרונים: {str(e)}")
+            return None
+        
+
 def get_nodebb_content(url, username, password):
     try:
         nodebb = NodeBBAPI()
@@ -505,11 +566,12 @@ def main():
     print("התוכנית מתחילה...")
     api = YemotAPI("0747098744", "123456")
     
-    forum_username = "ארץ הצבי"
-    forum_password = "@ארץ הצבי"
-    
     if api.login():
         print("התחברות לימות הצליחה!")
+        
+        # === שלוחה 1 - התראות ===
+        forum_username = "ארץ הצבי"
+        forum_password = "@ארץ הצבי"
         
         nodebb = NodeBBAPI()
         
@@ -530,25 +592,68 @@ def main():
             notifications = nodebb.get_notifications()
             
             if notifications and isinstance(notifications, list):
-                print(f"\nהתקבלו {len(notifications)} התראות, מתחיל בהעלאה...")
+                print(f"\nהתקבלו {len(notifications)} התראות, מתחיל בהעלאה לשלוחה 1...")
                 
                 for index, notification in enumerate(notifications):
                     if len(notification) > 10:
-                        result = api.upload_tts_file(notification, index)
+                        # העלאה לשלוחה 1
+                        data = {
+                            "token": api.token,
+                            "what": f"ivr2:/1/{index:03d}.tts",  # שלוחה 1
+                            "contents": clean_text_for_tts(notification, index + 1)
+                        }
                         
-                        if not result:
-                            print(f"דילוג על התראה {index + 1} בגלל שגיאה")
+                        try:
+                            response = requests.post(f"{api.base_url}UploadTextFile", data=data)
+                            if response.status_code == 200 and response.json().get('responseStatus') == 'OK':
+                                print(f"התראה {index + 1} הועלתה בהצלחה לשלוחה 1")
+                            else:
+                                print(f"שגיאה בהעלאת התראה {index + 1} לשלוחה 1")
+                        except Exception as e:
+                            print(f"שגיאה בהעלאת התראה {index + 1}: {str(e)}")
                         
                         time.sleep(2)
                 
-                print("\nסיום העלאת כל ההתראות")
+                print("\nסיום העלאת כל ההתראות לשלוחה 1")
             else:
                 print("לא התקבלו התראות מהשרת")
         else:
             print("ההתחברות לפורום נכשלה")
+
+        # === שלוחה 2 - פוסטים אחרונים ===
+        print("\nמתחיל בטיפול בפוסטים אחרונים לשלוחה 2...")
+        recent_posts_api = RecentPostsAPI()
+        posts = recent_posts_api.get_recent_posts(limit=10)
+        
+        if posts:
+            print(f"\nהתקבלו {len(posts)} פוסטים אחרונים, מתחיל בהעלאה לשלוחה 2...")
+            
+            for post in posts:
+                # העלאה לשלוחה 2
+                data = {
+                    "token": api.token,
+                    "what": f"ivr2:/2/{post['index']:03d}.tts",  # שלוחה 2
+                    "contents": post['text']
+                }
+                
+                try:
+                    response = requests.post(f"{api.base_url}UploadTextFile", data=data)
+                    if response.status_code == 200 and response.json().get('responseStatus') == 'OK':
+                        print(f"פוסט {post['index'] + 1} הועלה בהצלחה לשלוחה 2")
+                    else:
+                        print(f"שגיאה בהעלאת פוסט {post['index'] + 1} לשלוחה 2")
+                except Exception as e:
+                    print(f"שגיאה בהעלאת פוסט {post['index'] + 1}: {str(e)}")
+                
+                time.sleep(2)
+            
+            print("\nסיום העלאת כל הפוסטים האחרונים לשלוחה 2")
+        else:
+            print("לא התקבלו פוסטים אחרונים")
     else:
         print("ההתחברות לימות נכשלה")
-    print("התוכנית הסתיימה.")
     
+    print("התוכנית הסתיימה.")
+
 if __name__ == "__main__":
     main()
