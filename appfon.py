@@ -484,19 +484,48 @@ class RecentPostsAPI:
         מושך את הנושאים האחרונים מהפורום
         """
         try:
+            # שינוי ה-endpoint ל-/api/recent/posts
             response = self.session.get(
-                f"{self.base_url}/api/recent",
+                f"{self.base_url}/api/recent/posts",  # זה השינוי - במקום /api/recent
                 params={'count': limit},
                 headers=self.headers
             )
             
             if not response.ok:
+                print(f"שגיאה בקבלת נושאים אחרונים: {response.status_code}")
+                print(f"תוכן התגובה: {response.text[:200]}")
                 return None
 
-            topics_data = response.json()
-            if isinstance(topics_data, list):
-                return topics_data
-            return None
+            posts_data = response.json()
+            if not posts_data:
+                print("לא התקבלו נתונים מהשרת")
+                return None
+
+            # מיפוי הפוסטים לנושאים
+            topics = []
+            seen_tids = set()  # למניעת כפילויות
+            
+            for post in posts_data:
+                topic = post.get('topic', {})
+                tid = topic.get('tid')
+                
+                if tid and tid not in seen_tids:
+                    seen_tids.add(tid)
+                    topics.append({
+                        'tid': tid,
+                        'title': topic.get('title', 'נושא ללא כותרת'),
+                        'timestamp': post.get('timestamp', 0)
+                    })
+                    
+                    if len(topics) >= limit:
+                        break
+
+            if topics:
+                print(f"נמצאו {len(topics)} נושאים אחרונים")
+                return topics
+            else:
+                print("לא נמצאו נושאים אחרונים לאחר העיבוד")
+                return None
 
         except Exception as e:
             print(f"שגיאה בקבלת נושאים אחרונים: {str(e)}")
