@@ -1,19 +1,20 @@
-name: Run Code Every Minute
+name: Run Python Scripts Every 15 Minutes
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/15 * * * *"
+  workflow_dispatch:  # אפשרות להרצה ידנית
 
 jobs:
-  run_code:
+  run_scripts:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: '3.x'
 
@@ -22,5 +23,16 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Run script
+    - name: Run ymgr_parser script
+      run: python ymgr_parser_git.py
+
+    - name: Run appfon script
       run: python appfon.py
+
+    - name: Commit and push if changes
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add .
+        git diff --quiet && git diff --staged --quiet || git commit -m "עדכון אוטומטי $(date +'%Y-%m-%d %H:%M:%S')"
+        git push
