@@ -421,164 +421,171 @@ def clean_username(username):
 
 
 def main():
-    print("התוכנית מתחילה...")
-    api = YemotAPI("0747098744", "123456")
+    while True:  # לולאה אינסופית
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"\nהתוכנית מתחילה... ({current_time})")
+        api = YemotAPI("0747098744", "123456")
     
-    if not api.login():
-        print("ההתחברות לימות נכשלה")
-        return
+        if not api.login():
+            print("ההתחברות לימות נכשלה")
+            return
 
-    print("התחברות לימות הצליחה!")
+        print("התחברות לימות הצליחה!")
 
-    # קריאת נתוני המשתמשים מקובץ YMGR
-    print("מנסה לקרוא קובץ YMGR משלוחה 7...")
-    file_path = "ivr2:7/ApprovalAll.ymgr"
-    
-    params = {
-        'token': api.token,
-        'wath': file_path,
-        'convertType': 'json',
-        'notLoadLang': 0,
-        'renderLanguage': 'HE'
-    }
-    
-    try:
-        response = requests.get(f"{api.base_url}RenderYMGRFile", params=params)
-        data = response.json()
+        # קריאת נתוני המשתמשים מקובץ YMGR
+        print("מנסה לקרוא קובץ YMGR משלוחה 7...")
+        file_path = "ivr2:7/ApprovalAll.ymgr"
         
-        if data.get("responseStatus") == "OK":
-            users_data = data.get("data", [])
+        params = {
+            'token': api.token,
+            'wath': file_path,
+            'convertType': 'json',
+            'notLoadLang': 0,
+            'renderLanguage': 'HE'
+        }
+        
+        try:
+            response = requests.get(f"{api.base_url}RenderYMGRFile", params=params)
+            data = response.json()
             
-                        # הדפסת הנתונים הגולמיים לדיבוג
-            print("\nנתונים גולמיים שהתקבלו:")
-            print(json.dumps(users_data, ensure_ascii=False, indent=2))
-            # יצירת מילון משתמשים מהנתונים
-            users = {}
-            for record in users_data:
-                if record.get('מצב הזמנה') == 'מאושר':  # רק רשומות מאושרות
-                    username = record.get('P050', '').strip()
-                    password = record.get('P051', '').strip()
-                    
-                    if username and password:
-                        sub_extension = len(users) + 1
-                        users[username] = {
-                            "forum_username": username,
-                            "forum_password": password,
-                            "sub_extension": sub_extension
-                        }
-                        print(f"נוסף משתמש: {username} עם שלוחה {sub_extension}")
-
-            if not users:
-                print("לא נמצאו משתמשים מאושרים")
-                return
-
-            print(f"\nנמצאו {len(users)} משתמשים")
-
-            # טיפול בכל המשתמשים
-            for username, user_data in users.items():
-                print(f"\nמטפל במשתמש: {username}")
+            if data.get("responseStatus") == "OK":
+                users_data = data.get("data", [])
                 
-                nodebb = NodeBBAPI()
-                if nodebb.login(user_data['forum_username'], user_data['forum_password']):
-                    print(f"התחברות לפורום הצליחה עבור {username}!")
-                    
-                    # קבלת הטשאטים של המשתמש
-                    chats = nodebb.get_chats()
-                    sorted_chats = sorted(chats, key=lambda x: int(x['roomId']), reverse=True)
-                    
-                    # יצירת אינדקס לטשאטים של המשתמש
-                    chat_index_text = "ברוכים הבאים למערכת הטשאטים.\n"
-                    chat_details = []
-                    
-                    # עיבוד הטשאטים
-                    for chat_index, chat in enumerate(sorted_chats, 1):
-                        messages = nodebb.get_chat_messages(chat['roomId'])
+                            # הדפסת הנתונים הגולמיים לדיבוג
+                print("\nנתונים גולמיים שהתקבלו:")
+                print(json.dumps(users_data, ensure_ascii=False, indent=2))
+                # יצירת מילון משתמשים מהנתונים
+                users = {}
+                for record in users_data:
+                    if record.get('מצב הזמנה') == 'מאושר':  # רק רשומות מאושרות
+                        username = record.get('P050', '').strip()
+                        password = record.get('P051', '').strip()
                         
-                        if not messages:
-                            continue
+                        if username and password:
+                            sub_extension = len(users) + 1
+                            users[username] = {
+                                "forum_username": username,
+                                "forum_password": password,
+                                "sub_extension": sub_extension
+                            }
+                            print(f"נוסף משתמש: {username} עם שלוחה {sub_extension}")
 
-                        # מציאת המשתמש השני בטשאט
-                        other_user = None
-                        for message in messages:
-                            username_in_chat = clean_username(message['fromUser']['username'])
-                            if username_in_chat != user_data['forum_username']:
-                                other_user = username_in_chat
-                                break
+                if not users:
+                    print("לא נמצאו משתמשים מאושרים")
+                    return
+
+                print(f"\nנמצאו {len(users)} משתמשים")
+
+                # טיפול בכל המשתמשים
+                for username, user_data in users.items():
+                    print(f"\nמטפל במשתמש: {username}")
+                    
+                    nodebb = NodeBBAPI()
+                    if nodebb.login(user_data['forum_username'], user_data['forum_password']):
+                        print(f"התחברות לפורום הצליחה עבור {username}!")
                         
-                        if not other_user:
-                            continue
-
-                        print(f"נמצא טשאט {chat_index} עם {other_user}")
-                        chat_index_text += f"לטשאט עם {other_user}, אנא הקש {chat_index}.\n"
-                        chat_details.append({
-                            'index': chat_index,
-                            'username': other_user,
-                            'messages': messages
-                        })
-
-                    # העלאת האינדקס לשלוחה של המשתמש
-                    print(f"\nמעלה אינדקס לשלוחה 5/{user_data['sub_extension']}...")
-                    data = {
-                        "token": api.token,
-                        "what": f"ivr2:/5/{user_data['sub_extension']}/M1000.tts",
-                        "contents": clean_text_for_tts(chat_index_text)
-                    }
-                    try:
-                        response = requests.post(f"{api.base_url}UploadTextFile", data=data)
-                        if response.status_code == 200 and response.json().get('responseStatus') == 'OK':
-                            print(f"אינדקס טשאטים הועלה בהצלחה למשתמש {username}")
-                            print(f"תוכן האינדקס:\n{chat_index_text}")
-                    except Exception as e:
-                        print(f"שגיאה בהעלאת אינדקס: {str(e)}")
-
-                    # העלאת תוכן הטשאטים
-                    for chat in chat_details:
-                        print(f"\nמעלה טשאט {chat['index']} למשתמש {username}...")
+                        # קבלת הטשאטים של המשתמש
+                        chats = nodebb.get_chats()
+                        sorted_chats = sorted(chats, key=lambda x: int(x['roomId']), reverse=True)
                         
-                        # העלאת הקדמת הטשאט
-                        chat_intro = f"טשאט עם {chat['username']}. {len(chat['messages'])} הודעות."
+                        # יצירת אינדקס לטשאטים של המשתמש
+                        chat_index_text = "ברוכים הבאים למערכת הטשאטים.\n"
+                        chat_details = []
+                        
+                        # עיבוד הטשאטים
+                        for chat_index, chat in enumerate(sorted_chats, 1):
+                            messages = nodebb.get_chat_messages(chat['roomId'])
+                            
+                            if not messages:
+                                continue
+
+                            # מציאת המשתמש השני בטשאט
+                            other_user = None
+                            for message in messages:
+                                username_in_chat = clean_username(message['fromUser']['username'])
+                                if username_in_chat != user_data['forum_username']:
+                                    other_user = username_in_chat
+                                    break
+                            
+                            if not other_user:
+                                continue
+
+                            print(f"נמצא טשאט {chat_index} עם {other_user}")
+                            chat_index_text += f"לטשאט עם {other_user}, אנא הקש {chat_index}.\n"
+                            chat_details.append({
+                                'index': chat_index,
+                                'username': other_user,
+                                'messages': messages
+                            })
+
+                        # העלאת האינדקס לשלוחה של המשתמש
+                        print(f"\nמעלה אינדקס לשלוחה 5/{user_data['sub_extension']}...")
                         data = {
                             "token": api.token,
-                            "what": f"ivr2:/5/{user_data['sub_extension']}/{chat['index']}/000.tts",
-                            "contents": clean_text_for_tts(chat_intro)
+                            "what": f"ivr2:/5/{user_data['sub_extension']}/M1000.tts",
+                            "contents": clean_text_for_tts(chat_index_text)
                         }
                         try:
                             response = requests.post(f"{api.base_url}UploadTextFile", data=data)
-                            if response.status_code == 200:
-                                print(f"הקדמת טשאט {chat['index']} הועלתה")
+                            if response.status_code == 200 and response.json().get('responseStatus') == 'OK':
+                                print(f"אינדקס טשאטים הועלה בהצלחה למשתמש {username}")
+                                print(f"תוכן האינדקס:\n{chat_index_text}")
                         except Exception as e:
-                            print(f"שגיאה בהעלאת הקדמה: {str(e)}")
+                            print(f"שגיאה בהעלאת אינדקס: {str(e)}")
 
-                        # העלאת ההודעות
-                        for msg_index, message in enumerate(chat['messages'], 1):
-                            username = clean_username(message['fromUser']['username'])
-                            msg_text = f"הודעה מ{username}: {message['content']}"
+                        # העלאת תוכן הטשאטים
+                        for chat in chat_details:
+                            print(f"\nמעלה טשאט {chat['index']} למשתמש {username}...")
+                            
+                            # העלאת הקדמת הטשאט
+                            chat_intro = f"טשאט עם {chat['username']}. {len(chat['messages'])} הודעות."
                             data = {
                                 "token": api.token,
-                                "what": f"ivr2:/5/{user_data['sub_extension']}/{chat['index']}/{msg_index:03d}.tts",
-                                "contents": clean_text_for_tts(msg_text)
+                                "what": f"ivr2:/5/{user_data['sub_extension']}/{chat['index']}/000.tts",
+                                "contents": clean_text_for_tts(chat_intro)
                             }
                             try:
                                 response = requests.post(f"{api.base_url}UploadTextFile", data=data)
                                 if response.status_code == 200:
-                                    print(f"הודעה {msg_index} הועלתה")
+                                    print(f"הקדמת טשאט {chat['index']} הועלתה")
                             except Exception as e:
-                                print(f"שגיאה בהעלאת הודעה: {str(e)}")
-                            
-                            time.sleep(0.1)
-                        
-                        time.sleep(0.5)
-                else:
-                    print(f"ההתחברות לפורום נכשלה עבור {username}")
-        else:
-            print("שגיאה בקריאת קובץ YMGR")
-            return
-            
-    except Exception as e:
-        print(f"שגיאה בקריאת קובץ YMGR: {str(e)}")
-        return
+                                print(f"שגיאה בהעלאת הקדמה: {str(e)}")
 
-    print("התוכנית הסתיימה")
+                            # העלאת ההודעות
+                            for msg_index, message in enumerate(chat['messages'], 1):
+                                username = clean_username(message['fromUser']['username'])
+                                msg_text = f"הודעה מ{username}: {message['content']}"
+                                data = {
+                                    "token": api.token,
+                                    "what": f"ivr2:/5/{user_data['sub_extension']}/{chat['index']}/{msg_index:03d}.tts",
+                                    "contents": clean_text_for_tts(msg_text)
+                                }
+                                try:
+                                    response = requests.post(f"{api.base_url}UploadTextFile", data=data)
+                                    if response.status_code == 200:
+                                        print(f"הודעה {msg_index} הועלתה")
+                                except Exception as e:
+                                    print(f"שגיאה בהעלאת הודעה: {str(e)}")
+                                
+                                time.sleep(0.1)
+                            
+                            time.sleep(0.5)
+                    else:
+                        print(f"ההתחברות לפורום נכשלה עבור {username}")
+            else:
+                print("שגיאה בקריאת קובץ YMGR")
+                return
+                
+        except Exception as e:
+            print(f"שגיאה בקריאת קובץ YMGR: {str(e)}")
+            return
+
+        print("התוכנית הסתיימה")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nהתוכנית הופסקה ידנית על ידי המשתמש")
+    except Exception as e:
+        print(f"\nשגיאה לא צפויה: {str(e)}")
