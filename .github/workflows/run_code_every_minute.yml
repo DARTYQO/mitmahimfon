@@ -2,7 +2,7 @@ name: Run Python Scripts Every 15 Minutes
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "*/150 * * * *"
   workflow_dispatch:  # אפשרות להרצה ידנית
 
 jobs:
