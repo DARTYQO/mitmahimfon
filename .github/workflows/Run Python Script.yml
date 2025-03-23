@@ -1,0 +1,33 @@
+name: Run Python Scripts Manually
+
+on:
+  workflow_dispatch:  # אפשרות להרצה ידנית בלבד
+
+jobs:
+  run_scripts:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+      
+    - name: Run chatfon script
+      run: python chatfon.py
+
+    - name: Commit and push if changes
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add .
+        git diff --quiet && git diff --staged --quiet || git commit -m "עדכון ידני $(date +'%Y-%m-%d %H:%M:%S')"
+        git push
