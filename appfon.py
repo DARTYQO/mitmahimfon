@@ -4,6 +4,7 @@ import json
 import time
 import urllib3
 import re
+from datetime import datetime
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def my_where():
@@ -634,7 +635,7 @@ class RecentPostsAPI:
         print("\nמעלה את קובץ האינדקס הראשי...")
         data = {
             "token": yemot_api.token,
-            "what": "ivr2:/2/000.tts",
+            "what": "ivr2:/2/M1000.tts",
             "contents": clean_text_for_tts(index_text)
         }
         
@@ -854,7 +855,11 @@ def get_nodebb_content(url, username, password):
 
 
 def main():
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): {current_time}")
+    print("Current User's Login: MMDARTYQO")
     print("התוכנית מתחילה...")
+    
     api = YemotAPI("0747098744", "123456")
     
     if not api.login():
@@ -863,75 +868,109 @@ def main():
 
     print("התחברות לימות הצליחה!")
 
-    # הגדרת המשתמשים
-    users = {
-        "משתמש1": {
-            "forum_username": "ארץ הצבי",
-            "forum_password": "@ארץ הצבי",
-            "sub_extension": 1  # יהיה בשלוחות 1/1 ו-3/1
-        },
-        "משתמש2": {
-            "forum_username": "בינה אנושית",
-            "forum_password": "@בינה אנושית",
-            "sub_extension": 2  # יהיה בשלוחות 1/2 ו-3/2
-        }
+    # קריאת נתוני המשתמשים מקובץ YMGR
+    print("מנסה לקרוא קובץ YMGR משלוחה 7...")
+    file_path = "ivr2:7/ApprovalAll.ymgr"
+    
+    params = {
+        'token': api.token,
+        'wath': file_path,
+        'convertType': 'json',
+        'notLoadLang': 0,
+        'renderLanguage': 'HE'
     }
-
-    # טיפול בכל המשתמשים
-    for username, user_data in users.items():
-        print(f"\nמטפל במשתמש: {username}")
+    
+    try:
+        response = requests.get(f"{api.base_url}RenderYMGRFile", params=params)
+        data = response.json()
         
-        nodebb = NodeBBAPI()
-        if nodebb.login(user_data['forum_username'], user_data['forum_password']):
-            print(f"התחברות לפורום הצליחה עבור {username}!")
+        if data.get("responseStatus") == "OK":
+            users_data = data.get("data", [])
             
-            # העלאת התראות לשלוחה 1/X
-            notifications = nodebb.get_notifications()
-            if notifications:
-                for index, notification in enumerate(notifications):
-                    if len(notification) > 10:
+            # יצירת מילון משתמשים מהנתונים
+            users = {}
+            for record in users_data:
+                if record.get('מצב הזמנה') == 'מאושר':
+                    username = record.get('P050', '').strip()
+                    password = record.get('P051', '').strip()
+                    
+                    if username and password:
+                        sub_extension = len(users) + 1
+                        users[username] = {
+                            "forum_username": username,
+                            "forum_password": password,
+                            "sub_extension": sub_extension
+                        }
+                        print(f"נוסף משתמש: {username} עם שלוחה {sub_extension}")
+
+            if not users:
+                print("לא נמצאו משתמשים מאושרים")
+                return
+
+            print(f"\nנמצאו {len(users)} משתמשים")
+
+            # טיפול בכל המשתמשים
+            for username, user_data in users.items():
+                print(f"\nמטפל במשתמש: {username}")
+                
+                nodebb = NodeBBAPI()
+                if nodebb.login(user_data['forum_username'], user_data['forum_password']):
+                    print(f"התחברות לפורום הצליחה עבור {username}!")
+                    
+                    # העלאת התראות לשלוחה 1/X
+                    notifications = nodebb.get_notifications()
+                    if notifications:
+                        for index, notification in enumerate(notifications):
+                            if len(notification) > 10:
+                                data = {
+                                    "token": api.token,
+                                    "what": f"ivr2:/1/{user_data['sub_extension']}/{index:03d}.tts",
+                                    "contents": clean_text_for_tts(notification, index + 1)
+                                }
+                                try:
+                                    response = requests.post(f"{api.base_url}UploadTextFile", data=data)
+                                    if response.status_code == 200 and response.json().get('responseStatus') == 'OK':
+                                        print(f"התראה {index + 1} הועלתה בהצלחה למשתמש {username}")
+                                except Exception as e:
+                                    print(f"שגיאה בהעלאת התראה: {str(e)}")
+                                time.sleep(2)
+                    
+                    # העלאת פרופיל לשלוחה 3/X
+                    profile_text = nodebb.get_user_profile(user_data['forum_username'])
+                    if profile_text:
                         data = {
                             "token": api.token,
-                            "what": f"ivr2:/1/{user_data['sub_extension']}/{index:03d}.tts",
-                            "contents": clean_text_for_tts(notification, index + 1)
+                            "what": f"ivr2:/3/{user_data['sub_extension']}/000.tts",
+                            "contents": clean_text_for_tts(profile_text)
                         }
                         try:
                             response = requests.post(f"{api.base_url}UploadTextFile", data=data)
                             if response.status_code == 200 and response.json().get('responseStatus') == 'OK':
-                                print(f"התראה {index + 1} הועלתה בהצלחה למשתמש {username}")
+                                print(f"פרופיל הועלה בהצלחה למשתמש {username}")
                         except Exception as e:
-                            print(f"שגיאה בהעלאת התראה: {str(e)}")
-                        time.sleep(2)
-            
-            # העלאת פרופיל לשלוחה 3/X
-            profile_text = nodebb.get_user_profile(user_data['forum_username'])
-            if profile_text:
-                data = {
-                    "token": api.token,
-                    "what": f"ivr2:/3/{user_data['sub_extension']}/000.tts",
-                    "contents": clean_text_for_tts(profile_text)
-                }
-                try:
-                    response = requests.post(f"{api.base_url}UploadTextFile", data=data)
-                    if response.status_code == 200 and response.json().get('responseStatus') == 'OK':
-                        print(f"פרופיל הועלה בהצלחה למשתמש {username}")
-                except Exception as e:
-                    print(f"שגיאה בהעלאת פרופיל: {str(e)}")
+                            print(f"שגיאה בהעלאת פרופיל: {str(e)}")
+                else:
+                    print(f"ההתחברות לפורום נכשלה עבור {username}")
+
+            # === שלוחה 2 - פוסטים אחרונים ===
+            print("\nמתחיל בטיפול בפוסטים אחרונים לשלוחה 2...")
+            recent_posts_api = RecentPostsAPI()
+            recent_posts_api.upload_to_yemot(api, limit=10)
+
+            # === שלוחה 4 - נושאים מקטגוריית "כללי - עזרה הדדית" ===
+            print("\nמתחיל בטיפול בנושאי הפורום לשלוחה 4...")
+            forum_api = CategoryTopicsAPI()
+            forum_api.upload_to_yemot(api, category_id=66, topic_limit=10)
+
         else:
-            print(f"ההתחברות לפורום נכשלה עבור {username}")
+            print("שגיאה בקריאת קובץ YMGR")
+            return
+            
+    except Exception as e:
+        print(f"שגיאה בקריאת קובץ YMGR: {str(e)}")
+        return
 
-    # === שלוחה 2 - פוסטים אחרונים ===
-    print("\nמתחיל בטיפול בפוסטים אחרונים לשלוחה 2...")
-    recent_posts_api = RecentPostsAPI()
-    # השינוי כאן - קריאה ישירה ל-upload_to_yemot במקום לטפל בפוסטים בנפרד
-    recent_posts_api.upload_to_yemot(api, limit=10)
-
-    # === שלוחה 4 - נושאים מקטגוריית "כללי - עזרה הדדית" ===
-    print("\nמתחיל בטיפול בנושאי הפורום לשלוחה 4...")
-    forum_api = CategoryTopicsAPI()
-    forum_api.upload_to_yemot(api, category_id=66, topic_limit=10)
-
-    print("התוכנית הסתיימה.")
+    print("התוכנית הסתיימה")
 
 if __name__ == "__main__":
     main()
