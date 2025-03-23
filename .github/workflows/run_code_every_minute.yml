@@ -23,9 +23,6 @@ jobs:
 
     - name: Run appfon script
       run: python appfon.py
-      
-    - name: Run chatfon script
-      run: python chatfon.py
 
     - name: Commit and push if changes
       run: |
