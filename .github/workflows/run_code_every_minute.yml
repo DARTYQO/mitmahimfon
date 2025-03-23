@@ -1,9 +1,7 @@
-name: Run Python Scripts Every 15 Minutes
+name: Run Python Scripts Manually
 
 on:
-  schedule:
-    - cron: "*/15000 * * * *"
-  workflow_dispatch:  # אפשרות להרצה ידנית
+  workflow_dispatch:  # אפשרות להרצה ידנית בלבד
 
 jobs:
   run_scripts:
@@ -26,7 +24,7 @@ jobs:
     - name: Run appfon script
       run: python appfon.py
       
-    - name: Run appfon script
+    - name: Run chatfon script
       run: python chatfon.py
 
     - name: Commit and push if changes
@@ -34,5 +32,5 @@ jobs:
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
         git add .
-        git diff --quiet && git diff --staged --quiet || git commit -m "עדכון אוטומטי $(date +'%Y-%m-%d %H:%M:%S')"
+        git diff --quiet && git diff --staged --quiet || git commit -m "עדכון ידני $(date +'%Y-%m-%d %H:%M:%S')"
         git push
