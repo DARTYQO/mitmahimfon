@@ -23,11 +23,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Run ymgr_parser script
-      run: python ymgr_parser_git.py
-
     - name: Run appfon script
       run: python appfon.py
+      
+    - name: Run appfon script
+      run: python chatfon.py
 
     - name: Commit and push if changes
       run: |
