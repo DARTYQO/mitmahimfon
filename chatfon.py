@@ -515,7 +515,8 @@ def main():
                             chat_details.append({
                                 'index': chat_index,
                                 'username': other_user,
-                                'messages': messages
+                                'messages': messages,
+                                'roomId': chat['roomId']
                             })
 
                         # העלאת האינדקס לשלוחה של המשתמש
@@ -538,7 +539,7 @@ def main():
                             print(f"\nמעלה טשאט {chat['index']} למשתמש {username}...")
                             
                             # העלאת הקדמת הטשאט
-                            chat_intro = f"טשאט עם {chat['username']}. {len(chat['messages'])} הודעות."
+                            chat_intro = f"טשאט עם {chat['username']}. {len(chat['messages'])} הודעות. מזהה חדר {chat['roomId']}"
                             data = {
                                 "token": api.token,
                                 "what": f"ivr2:/5/{user_data['sub_extension']}/{chat['index']}/000.tts",
