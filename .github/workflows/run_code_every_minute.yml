@@ -1,33 +1,71 @@
-name: Run Python Scripts Manually
+name: Run Scripts Every 5 Minutes
 
 on:
-  workflow_dispatch:  # אפשרות להרצה ידנית בלבד
+  workflow_dispatch:  # אפשרות להפעלה ידנית
+  schedule:
+    - cron: '*/5 * * * *'  # הפעלה כל 5 דקות
 
 jobs:
-  run_scripts:
+  run-scripts:
     runs-on: ubuntu-latest
+    timeout-minutes: 4  # הגבלת זמן ריצה ל-4 דקות (מתוך 5)
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v3
 
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.x'
+        python-version: '3.9'
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install requests beautifulsoup4 urllib3
 
-    - name: Run appfon script
-      run: python appfon.py
-
-    - name: Commit and push if changes
+    - name: Set up environment
       run: |
-        git config --local user.email "github-actions[bot]@users.noreply.github.com"
-        git config --local user.name "github-actions[bot]"
-        git add .
-        git diff --quiet && git diff --staged --quiet || git commit -m "עדכון ידני $(date +'%Y-%m-%d %H:%M:%S')"
-        git push
+        sudo mkdir -p /ProgramData/NetFree/CA
+        sudo touch /ProgramData/NetFree/CA/netfree-ca-list.crt
+
+    - name: Run chatfon.py
+      env:
+        YEMOT_USERNAME: ${{ secrets.YEMOT_USERNAME }}
+        YEMOT_PASSWORD: ${{ secrets.YEMOT_PASSWORD }}
+      run: |
+        echo "Starting chatfon.py at $(date)"
+        python chatfon.py
+        echo "Finished chatfon.py at $(date)"
+
+    - name: Run appfon.py
+      env:
+        YEMOT_USERNAME: ${{ secrets.YEMOT_USERNAME }}
+        YEMOT_PASSWORD: ${{ secrets.YEMOT_PASSWORD }}
+      run: |
+        echo "Starting appfon.py at $(date)"
+        python appfon.py
+        echo "Finished appfon.py at $(date)"
+
+    - name: Run send_chat
+      env:
+        YEMOT_USERNAME: ${{ secrets.YEMOT_USERNAME }}
+        YEMOT_PASSWORD: ${{ secrets.YEMOT_PASSWORD }}
+      run: |
+        echo "Starting send_chat at $(date)"
+        python send_chat
+        echo "Finished send_chat at $(date)"
+
+    - name: Handle completion
+      if: always()
+      run: |
+        echo "All scripts execution completed at $(date)"
+
+    - name: Upload logs
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: execution-logs
+        path: |
+          *.log
+          logs/*.log
