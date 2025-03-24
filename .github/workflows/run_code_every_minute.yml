@@ -29,25 +29,10 @@ jobs:
         sudo touch /ProgramData/NetFree/CA/netfree-ca-list.crt
 
     - name: Run chatfon.py
-      env:
-        YEMOT_USERNAME: ${{ secrets.0747098744 }}
-        YEMOT_PASSWORD: ${{ secrets.123456 }}
-      run: |
-        echo "Starting chatfon.py"
-        python chatfon.py
+      run: python chatfon.py
 
     - name: Run appfon.py
-      env:
-        YEMOT_USERNAME: ${{ secrets.0747098744 }}
-        YEMOT_PASSWORD: ${{ secrets.123456 }}
-      run: |
-        echo "Starting appfon.py"
-        python appfon.py
+      run: python appfon.py
 
     - name: Run send_chat
-      env:
-        YEMOT_USERNAME: ${{ secrets.0747098744 }}
-        YEMOT_PASSWORD: ${{ secrets.123456 }}
-      run: |
-        echo "Starting send_chat"
-        python send_chat
+      run: python send_chat
