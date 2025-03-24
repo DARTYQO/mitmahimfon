@@ -8,8 +8,7 @@ on:
 jobs:
   run-scripts:
     runs-on: ubuntu-latest
-    timeout-minutes: 4  # הגבלת זמן ריצה ל-4 דקות (מתוך 5)
-
+    
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
@@ -24,48 +23,13 @@ jobs:
         python -m pip install --upgrade pip
         pip install requests beautifulsoup4 urllib3
 
-    - name: Set up environment
+    - name: Set up NetFree certificate
       run: |
         sudo mkdir -p /ProgramData/NetFree/CA
         sudo touch /ProgramData/NetFree/CA/netfree-ca-list.crt
 
-    - name: Run chatfon.py
+    - name: Run scripts
       env:
         YEMOT_USERNAME: ${{ secrets.YEMOT_USERNAME }}
         YEMOT_PASSWORD: ${{ secrets.YEMOT_PASSWORD }}
-      run: |
-        echo "Starting chatfon.py at $(date)"
-        python chatfon.py
-        echo "Finished chatfon.py at $(date)"
-
-    - name: Run appfon.py
-      env:
-        YEMOT_USERNAME: ${{ secrets.YEMOT_USERNAME }}
-        YEMOT_PASSWORD: ${{ secrets.YEMOT_PASSWORD }}
-      run: |
-        echo "Starting appfon.py at $(date)"
-        python appfon.py
-        echo "Finished appfon.py at $(date)"
-
-    - name: Run send_chat
-      env:
-        YEMOT_USERNAME: ${{ secrets.YEMOT_USERNAME }}
-        YEMOT_PASSWORD: ${{ secrets.YEMOT_PASSWORD }}
-      run: |
-        echo "Starting send_chat at $(date)"
-        python send_chat
-        echo "Finished send_chat at $(date)"
-
-    - name: Handle completion
-      if: always()
-      run: |
-        echo "All scripts execution completed at $(date)"
-
-    - name: Upload logs
-      if: always()
-      uses: actions/upload-artifact@v3
-      with:
-        name: execution-logs
-        path: |
-          *.log
-          logs/*.log
+      run: python runner.py
