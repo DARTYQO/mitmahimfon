@@ -28,8 +28,26 @@ jobs:
         sudo mkdir -p /ProgramData/NetFree/CA
         sudo touch /ProgramData/NetFree/CA/netfree-ca-list.crt
 
-    - name: Run scripts
+    - name: Run chatfon.py
       env:
-        YEMOT_USERNAME: ${{ secrets.YEMOT_USERNAME }}
-        YEMOT_PASSWORD: ${{ secrets.YEMOT_PASSWORD }}
-      run: python runner.py
+        YEMOT_USERNAME: ${{ secrets.0747098744 }}
+        YEMOT_PASSWORD: ${{ secrets.123456 }}
+      run: |
+        echo "Starting chatfon.py"
+        python chatfon.py
+
+    - name: Run appfon.py
+      env:
+        YEMOT_USERNAME: ${{ secrets.0747098744 }}
+        YEMOT_PASSWORD: ${{ secrets.123456 }}
+      run: |
+        echo "Starting appfon.py"
+        python appfon.py
+
+    - name: Run send_chat
+      env:
+        YEMOT_USERNAME: ${{ secrets.0747098744 }}
+        YEMOT_PASSWORD: ${{ secrets.123456 }}
+      run: |
+        echo "Starting send_chat"
+        python send_chat
